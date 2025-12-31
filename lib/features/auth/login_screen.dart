@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme.dart';
+import '../../services/auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -14,18 +16,63 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
+  bool _obscurePassword = true;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
 
   Future<void> _login() async {
+    if (_emailController.text.trim().isEmpty || 
+        _passwordController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter email and password')),
+      );
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
-    // Mock login delay
-    await Future.delayed(const Duration(seconds: 1));
-    setState(() {
-      _isLoading = false;
-    });
-    if (mounted) {
-      context.go('/dashboard');
+
+    try {
+      final response = await AuthService().signIn(
+        _emailController.text.trim(),
+        _passwordController.text.trim(),
+      );
+
+      if (mounted) {
+        if (response.user != null) {
+          context.go('/dashboard');
+        }
+      }
+    } on AuthException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.message),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('An unexpected error occurred. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -59,12 +106,21 @@ class _LoginScreenState extends State<LoginScreen> {
             const SizedBox(height: 16),
             TextField(
               controller: _passwordController,
-              obscureText: true,
+              obscureText: _obscurePassword,
               decoration: InputDecoration(
                 labelText: 'Password',
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 prefixIcon: const Icon(Icons.lock_outline),
-                suffixIcon: const Icon(Icons.visibility_off_outlined),
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _obscurePassword = !_obscurePassword;
+                    });
+                  },
+                ),
               ),
             ),
             Align(

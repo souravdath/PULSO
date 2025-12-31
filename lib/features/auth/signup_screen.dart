@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme.dart';
+import '../../services/auth_service.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -11,13 +13,34 @@ class SignupScreen extends StatefulWidget {
 }
 
 class _SignupScreenState extends State<SignupScreen> {
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
   bool _agreedToTerms = false;
   bool _isLoading = false;
+  bool _obscurePassword = true;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
 
   Future<void> _signUp() async {
-     if (!_agreedToTerms) {
+    if (!_agreedToTerms) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please accept the terms and conditions')),
+      );
+      return;
+    }
+
+    if (_nameController.text.trim().isEmpty || 
+        _emailController.text.trim().isEmpty || 
+        _passwordController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill in all fields')),
       );
       return;
     }
@@ -25,13 +48,43 @@ class _SignupScreenState extends State<SignupScreen> {
     setState(() {
       _isLoading = true;
     });
-    // Mock signup delay
-    await Future.delayed(const Duration(seconds: 1));
-    setState(() {
-      _isLoading = false;
-    });
-    if (mounted) {
-      context.go('/dashboard');
+
+    try {
+      final response = await AuthService().signUp(
+        _emailController.text.trim(),
+        _passwordController.text.trim(),
+        _nameController.text.trim(),
+      );
+
+      if (mounted) {
+        if (response.user != null) {
+           context.go('/questionnaire');
+        }
+      }
+    } on AuthException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.message),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('An unexpected error occurred. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -55,6 +108,7 @@ class _SignupScreenState extends State<SignupScreen> {
           children: [
             const SizedBox(height: 20),
             TextField(
+              controller: _nameController,
               decoration: InputDecoration(
                 labelText: 'Full Name',
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -63,6 +117,7 @@ class _SignupScreenState extends State<SignupScreen> {
             ),
             const SizedBox(height: 16),
             TextField(
+              controller: _emailController,
               decoration: InputDecoration(
                 labelText: 'Email',
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -71,11 +126,22 @@ class _SignupScreenState extends State<SignupScreen> {
             ),
             const SizedBox(height: 16),
             TextField(
-              obscureText: true,
+              controller: _passwordController,
+              obscureText: _obscurePassword,
               decoration: InputDecoration(
                 labelText: 'Password',
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 prefixIcon: const Icon(Icons.lock_outline),
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _obscurePassword = !_obscurePassword;
+                    });
+                  },
+                ),
               ),
             ),
              const SizedBox(height: 20),

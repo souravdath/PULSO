@@ -14,6 +14,7 @@ import '../features/insights/detailed_report_screen.dart';
 import '../features/history/history_screen.dart';
 import '../features/profile/profile_screen.dart';
 import 'shell_screen.dart';
+import '../screens/questionnaire_screen.dart';
 
 class AppRouter {
   static final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -43,6 +44,11 @@ class AppRouter {
       GoRoute(
         path: '/signup',
         builder: (context, state) => const SignupScreen(),
+      ),
+      
+      GoRoute(
+        path: '/questionnaire',
+        builder: (context, state) => const QuestionnaireScreen(), // Or whatever your class name is
       ),
 
       // Authenticated Shell Flow

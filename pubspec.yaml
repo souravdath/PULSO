@@ -30,6 +30,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  supabase_flutter: ^2.10.3  # Add this line
 
   # Navigation
   go_router: ^14.0.0
