@@ -25,10 +25,7 @@ class AppRouter {
     initialLocation: '/',
     routes: [
       // Entry Flow (No Shell)
-      GoRoute(
-        path: '/',
-        builder: (context, state) => const SplashScreen(),
-      ),
+      GoRoute(path: '/', builder: (context, state) => const SplashScreen()),
       GoRoute(
         path: '/onboarding',
         builder: (context, state) => const OnboardingScreen(),
@@ -37,18 +34,16 @@ class AppRouter {
         path: '/welcome',
         builder: (context, state) => const WelcomeScreen(),
       ),
-      GoRoute(
-        path: '/login',
-        builder: (context, state) => const LoginScreen(),
-      ),
+      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(
         path: '/signup',
         builder: (context, state) => const SignupScreen(),
       ),
-      
+
       GoRoute(
         path: '/questionnaire',
-        builder: (context, state) => const QuestionnaireScreen(), // Or whatever your class name is
+        builder: (context, state) =>
+            const QuestionnaireScreen(), // Or whatever your class name is
       ),
 
       // Authenticated Shell Flow
@@ -66,7 +61,7 @@ class AppRouter {
               ),
             ],
           ),
-          
+
           // Live ECG
           StatefulShellBranch(
             routes: [
@@ -74,12 +69,12 @@ class AppRouter {
                 path: '/ecg',
                 builder: (context, state) => const ECGScreen(),
                 routes: [
-                   GoRoute(
+                  GoRoute(
                     path: 'pairing',
                     parentNavigatorKey: _rootNavigatorKey, // Full screen
                     builder: (context, state) => const DevicePairingScreen(),
                   ),
-                   GoRoute(
+                  GoRoute(
                     path: 'summary',
                     parentNavigatorKey: _rootNavigatorKey, // Full screen
                     builder: (context, state) => const SessionSummaryScreen(),

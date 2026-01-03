@@ -31,6 +31,7 @@ dependencies:
   flutter:
     sdk: flutter
   supabase_flutter: ^2.10.3  # Add this line
+  google_sign_in: ^6.2.2
 
   # Navigation
   go_router: ^14.0.0
@@ -46,8 +47,7 @@ dependencies:
   google_fonts: ^6.1.0
   cupertino_icons: ^1.0.8
   intl: ^0.19.0
-  flutter_bluetooth_serial:
-    path: packages/flutter_bluetooth_serial
+  flutter_bluetooth_serial: ^0.4.0
 
 dev_dependencies:
   flutter_test:

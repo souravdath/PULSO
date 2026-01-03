@@ -1,0 +1,46 @@
+{
+  "project_info": {
+    "project_number": "468953482168",
+    "project_id": "pulso-ecg",
+    "storage_bucket": "pulso-ecg.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:468953482168:android:1317fea94002e7a531854d",
+        "android_client_info": {
+          "package_name": "com.example.pulso_app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "468953482168-6b444pvai566p9jnvk260ge10t8vcp3d.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDMPJEV83C3rL5tsu2uh6gsxIoZG_Hzy-Y"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "468953482168-6b444pvai566p9jnvk260ge10t8vcp3d.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "468953482168-p954i2amnp8go7cselp9cp6tgi0k4l7d.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.pulsoApp"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,12 @@
+// Patch flutter_bluetooth_serial to add namespace
+gradle.projectsEvaluated {
+    def bluetoothSerialProject = project.rootProject.allprojects.find { 
+        it.name == 'flutter_bluetooth_serial' 
+    }
+    
+    if (bluetoothSerialProject != null) {
+        bluetoothSerialProject.android {
+            namespace = 'com.github.edufolly.flutterbluetoothserial'
+        }
+    }
+}

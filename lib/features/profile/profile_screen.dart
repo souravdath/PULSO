@@ -2,12 +2,56 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/theme.dart';
+import '../../services/auth_service.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
   @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  bool _isLoading = true;
+  Map<String, dynamic>? _profileData;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchProfile();
+  }
+
+  Future<void> _fetchProfile() async {
+    final data = await AuthService().fetchCurrentUserProfile();
+    if (mounted) {
+      setState(() {
+        _profileData = data;
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _logout() async {
+    await AuthService().signOut();
+    if (mounted) context.go('/login');
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: AppColors.backgroundLight,
+        body: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+      );
+    }
+
+    final user = _profileData?['user'];
+    final medical = _profileData?['medical'];
+    final name = user?['name'] ?? 'User';
+    final age = medical?['age_at_record']?.toString() ?? '--';
+    final gender = medical?['gender'] ?? '--';
+    final conditions = medical?['existing_conditions'] ?? 'None';
+
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(
@@ -18,6 +62,15 @@ class ProfileScreen extends StatelessWidget {
             color: AppColors.textLight,
           ),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: AppColors.textLight),
+            onPressed: () {
+              setState(() => _isLoading = true);
+              _fetchProfile();
+            },
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
@@ -27,18 +80,21 @@ class ProfileScreen extends StatelessWidget {
             Center(
               child: Column(
                 children: [
-                  const CircleAvatar(
+                  CircleAvatar(
                     radius: 50,
                     backgroundColor: AppColors.primary,
-                    child: Icon(Icons.person, size: 50, color: Colors.white),
+                    child: Text(
+                      name.isNotEmpty ? name[0].toUpperCase() : 'U',
+                      style: GoogleFonts.outfit(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold),
+                    ),
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    "Alex Johnson",
+                    name,
                     style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold),
                   ),
                   Text(
-                    "Male, 34 yrs • 180cm • 75kg",
+                    "$gender, $age yrs",
                     style: GoogleFonts.outfit(color: Colors.grey),
                   ),
                 ],
@@ -48,9 +104,9 @@ class ProfileScreen extends StatelessWidget {
 
             // Settings Sections
             _buildSectionHeader("Medical Profile"),
-            _buildSettingItem("Known Conditions", "None"),
-            _buildSettingItem("Medications", "None"),
-             _buildSettingItem("Emergency Contact", "+1 555-0123"),
+            _buildSettingItem("Known Conditions", conditions),
+            _buildSettingItem("Medications", "None"), // Placeholder for now
+             _buildSettingItem("Emergency Contact", "+1 555-0123"), // Placeholder
 
             const SizedBox(height: 24),
             _buildSectionHeader("App Settings"),
@@ -61,9 +117,7 @@ class ProfileScreen extends StatelessWidget {
             
             const SizedBox(height: 32),
             OutlinedButton(
-              onPressed: () {
-                context.go('/welcome'); // Logout
-              },
+              onPressed: _logout,
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.error,
                 side: const BorderSide(color: AppColors.error),
@@ -100,7 +154,14 @@ class ProfileScreen extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
         title: Text(title, style: GoogleFonts.outfit(fontWeight: FontWeight.w500)),
-        trailing: Text(value, style: GoogleFonts.outfit(color: Colors.grey)),
+        trailing: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 200),
+          child: Text(
+            value, 
+            style: GoogleFonts.outfit(color: Colors.grey),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
       ),
     );
   }
