@@ -57,7 +57,7 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
             ),
             const SizedBox(height: 20),
             DropdownButtonFormField<String>(
-              value: _selectedGender,
+              initialValue: _selectedGender,
               items: ['Male', 'Female', 'Other'].map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
               onChanged: (val) => setState(() => _selectedGender = val!),
               decoration: const InputDecoration(labelText: 'Gender', border: OutlineInputBorder()),
