@@ -14,7 +14,10 @@ class ShellScreen extends StatelessWidget {
       bottomNavigationBar: NavigationBar(
         selectedIndex: navigationShell.currentIndex,
         onDestinationSelected: (index) {
-          navigationShell.goBranch(index, initialLocation: index == navigationShell.currentIndex);
+          navigationShell.goBranch(
+            index,
+            initialLocation: index == navigationShell.currentIndex,
+          );
         },
         indicatorColor: AppColors.primary.withOpacity(0.2),
         destinations: const [

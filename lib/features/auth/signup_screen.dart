@@ -112,7 +112,15 @@ class _SignupScreenState extends State<SignupScreen> {
 
       if (mounted) {
         if (response.user != null) {
-          context.go('/questionnaire');
+          final hasHistory = await AuthService().hasMedicalHistory();
+
+          if (mounted) {
+            if (hasHistory) {
+              context.go('/dashboard');
+            } else {
+              context.go('/questionnaire');
+            }
+          }
         }
       }
     } on AuthException catch (e) {
