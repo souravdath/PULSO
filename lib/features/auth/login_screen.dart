@@ -26,10 +26,27 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _login() async {
-    if (_emailController.text.trim().isEmpty || 
-        _passwordController.text.trim().isEmpty) {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+
+    if (email.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter email and password')),
+      );
+      return;
+    }
+
+    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+    if (!emailRegex.hasMatch(email)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a valid email address')),
+      );
+      return;
+    }
+
+    if (password.length < 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Password must be at least 6 characters')),
       );
       return;
     }
@@ -46,7 +63,15 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (mounted) {
         if (response.user != null) {
-          context.go('/dashboard');
+          final hasHistory = await AuthService().hasMedicalHistory();
+
+          if (mounted) {
+             if (hasHistory) {
+               context.go('/dashboard');
+             } else {
+               context.go('/questionnaire');
+             }
+          }
         }
       }
     } on AuthException catch (e) {

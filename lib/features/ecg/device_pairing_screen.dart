@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
 import '../../core/theme.dart';
 
 class DevicePairingScreen extends StatefulWidget {
@@ -14,88 +14,97 @@ class DevicePairingScreen extends StatefulWidget {
 
 class _DevicePairingScreenState extends State<DevicePairingScreen> {
   bool _isScanning = false;
-  List<ScanResult> _devices = [];
-  StreamSubscription? _scanSubscription;
+  List<BluetoothDiscoveryResult> _discoveryResults = [];
+  List<BluetoothDevice> _bondedDevices = [];
+  StreamSubscription<BluetoothDiscoveryResult>? _discoveryStreamSubscription;
 
   @override
   void initState() {
     super.initState();
-    _startScan();
+    _checkPermissions();
+    _getBondedDevices();
+    _startDiscovery();
   }
 
   @override
   void dispose() {
-    _scanSubscription?.cancel();
-    FlutterBluePlus.stopScan();
+    _cancelDiscovery();
     super.dispose();
   }
 
-  Future<void> _startScan() async {
-    // Check if Bluetooth is supported and on
-    if (await FlutterBluePlus.isSupported == false) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Bluetooth is not supported on this device"),
-          ),
-        );
-      }
-      return;
+  void _checkPermissions() async {
+    // Bluetooth permissions are handled by Android Manifest,
+    // but we can check if bluetooth is enabled.
+    bool? isEnabled = await FlutterBluetoothSerial.instance.isEnabled;
+    if (isEnabled == false) {
+      await FlutterBluetoothSerial.instance.requestEnable();
     }
+  }
 
-    // Listen to scan results
-    _scanSubscription = FlutterBluePlus.scanResults.listen((results) {
+  Future<void> _getBondedDevices() async {
+    try {
+      List<BluetoothDevice> bonded = await FlutterBluetoothSerial.instance
+          .getBondedDevices();
       if (mounted) {
         setState(() {
-          _devices = results;
+          _bondedDevices = bonded;
         });
       }
+    } catch (error) {
+      print("Error getting bonded devices: $error");
+    }
+  }
+
+  void _restartDiscovery() {
+    setState(() {
+      _discoveryResults.clear();
+      _isScanning = true;
     });
+    _startDiscovery();
+  }
 
-    try {
-      setState(() {
-        _isScanning = true;
-        _devices = []; // Clear previous results
-      });
+  void _startDiscovery() {
+    _discoveryStreamSubscription = FlutterBluetoothSerial.instance
+        .startDiscovery()
+        .listen((r) {
+          if (mounted) {
+            setState(() {
+              // Avoid duplicates
+              final existingIndex = _discoveryResults.indexWhere(
+                (element) => element.device.address == r.device.address,
+              );
+              if (existingIndex >= 0) {
+                _discoveryResults[existingIndex] = r;
+              } else {
+                _discoveryResults.add(r);
+              }
+            });
+          }
+        });
 
-      await FlutterBluePlus.startScan(timeout: const Duration(seconds: 15));
-
-      // Wait for scan to finish (startScan is async but returns when *started* not finished in some versions,
-      // but sticking to timeout logic).
-      // Actually with timeout, it stops automatically.
-      // We can listen to isScanning stream to update UI state properly.
-    } catch (e) {
-      print("Scan Error: $e");
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text("Scan Error: $e")));
-      }
-    } finally {
+    _discoveryStreamSubscription!.onDone(() {
       if (mounted) {
         setState(() {
           _isScanning = false;
         });
       }
+    });
+  }
+
+  void _cancelDiscovery() {
+    _discoveryStreamSubscription?.cancel();
+    _discoveryStreamSubscription = null;
+    if (mounted) {
+      setState(() {
+        _isScanning = false;
+      });
     }
   }
 
-  Future<void> _connect(BluetoothDevice device) async {
-    try {
-      await device.connect();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Connected to ${device.platformName}")),
-        );
-        context.pop(true);
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text("Connection failed: $e")));
-      }
-    }
+  void _onDeviceSelected(BluetoothDevice device) {
+    // Stop scanning before returning
+    _cancelDiscovery();
+    context.pop(device);
   }
 
   @override
@@ -123,10 +132,14 @@ class _DevicePairingScreenState extends State<DevicePairingScreen> {
               ),
               child: Column(
                 children: [
-                  const Icon(Icons.bluetooth, color: Colors.white, size: 40),
+                  Icon(
+                    _isScanning ? Icons.bluetooth_searching : Icons.bluetooth,
+                    color: Colors.white,
+                    size: 40,
+                  ),
                   const SizedBox(height: 12),
                   Text(
-                    _isScanning ? "Searching for devices..." : "Scan Complete",
+                    _isScanning ? "Scanning for devices..." : "Scan Complete",
                     style: GoogleFonts.outfit(
                       color: Colors.white,
                       fontSize: 18,
@@ -135,7 +148,7 @@ class _DevicePairingScreenState extends State<DevicePairingScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    "Make sure your device is turned on and nearby.",
+                    "Select your ESP32 device to start streaming ECG data.",
                     textAlign: TextAlign.center,
                     style: GoogleFonts.outfit(
                       color: Colors.white.withOpacity(0.8),
@@ -146,69 +159,113 @@ class _DevicePairingScreenState extends State<DevicePairingScreen> {
             ),
             const SizedBox(height: 24),
 
-            // Device List
-            Text(
-              "Available Devices",
-              style: GoogleFonts.outfit(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textLight,
+            // Scan Button
+            if (!_isScanning)
+              OutlinedButton(
+                onPressed: _restartDiscovery,
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: AppColors.primary),
+                ),
+                child: const Text("Scan Again"),
               ),
-            ),
-            const SizedBox(height: 12),
+            if (_isScanning)
+              OutlinedButton(
+                onPressed: _cancelDiscovery,
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: AppColors.error),
+                  foregroundColor: AppColors.error,
+                ),
+                child: const Text("Stop Scanning"),
+              ),
+
+            const SizedBox(height: 16),
+
+            // Device List
             Expanded(
-              child: _devices.isEmpty && _isScanning
-                  ? const Center(child: CircularProgressIndicator())
-                  : _devices.isEmpty
-                  ? Center(
-                      child: Text(
-                        "No devices found",
-                        style: GoogleFonts.outfit(color: Colors.grey),
+              child: ListView(
+                children: [
+                  if (_bondedDevices.isNotEmpty) ...[
+                    Text(
+                      "Paired Devices",
+                      style: GoogleFonts.outfit(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textLight,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ..._bondedDevices
+                        .map(
+                          (device) => _buildDeviceTile(device, isPaired: true),
+                        )
+                        .toList(),
+                    const SizedBox(height: 16),
+                  ],
+
+                  Text(
+                    "Available Devices",
+                    style: GoogleFonts.outfit(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textLight,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  if (_discoveryResults.isEmpty && _isScanning)
+                    const Padding(
+                      padding: EdgeInsets.all(20.0),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  else if (_discoveryResults.isEmpty && !_isScanning)
+                    Padding(
+                      padding: const EdgeInsets.all(20.0),
+                      child: Center(
+                        child: Text(
+                          "No new devices found",
+                          style: GoogleFonts.outfit(color: Colors.grey),
+                        ),
                       ),
                     )
-                  : ListView.builder(
-                      itemCount: _devices.length,
-                      itemBuilder: (context, index) {
-                        final device = _devices[index].device;
-                        final deviceName = device.platformName.isNotEmpty
-                            ? device.platformName
-                            : "Unknown Device (${device.remoteId})";
-                        return Card(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          child: ListTile(
-                            leading: const Icon(
-                              Icons.watch,
-                              color: AppColors.textLight,
-                            ),
-                            title: Text(
-                              deviceName,
-                              style: GoogleFonts.outfit(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            subtitle: Text(device.remoteId.toString()),
-                            trailing: ElevatedButton(
-                              onPressed: () => _connect(device),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.primary,
-                                foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                              ),
-                              child: const Text("Connect"),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-            ),
-            const SizedBox(height: 16),
-            OutlinedButton(
-              onPressed: _isScanning ? null : _startScan,
-              child: const Text("Scan Again"),
+                  else
+                    ..._discoveryResults
+                        .map((r) => _buildDeviceTile(r.device))
+                        .toList(),
+                ],
+              ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDeviceTile(BluetoothDevice device, {bool isPaired = false}) {
+    final deviceName = device.name ?? "Unknown Device";
+    final isConnected = device
+        .isConnected; // Note: isConnected might not be reliable without active check
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ListTile(
+        leading: Icon(
+          Icons.watch, // Or Icons.bluetooth
+          color: isPaired ? AppColors.primary : AppColors.textLight,
+        ),
+        title: Text(
+          deviceName,
+          style: GoogleFonts.outfit(fontWeight: FontWeight.w600),
+        ),
+        subtitle: Text(device.address),
+        trailing: ElevatedButton(
+          onPressed: () => _onDeviceSelected(device),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+          ),
+          child: const Text("Select"),
         ),
       ),
     );
