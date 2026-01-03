@@ -14,7 +14,7 @@ class DevicePairingScreen extends StatefulWidget {
 
 class _DevicePairingScreenState extends State<DevicePairingScreen> {
   bool _isScanning = false;
-  List<BluetoothDiscoveryResult> _discoveryResults = [];
+  final List<BluetoothDiscoveryResult> _discoveryResults = [];
   List<BluetoothDevice> _bondedDevices = [];
   StreamSubscription<BluetoothDiscoveryResult>? _discoveryStreamSubscription;
 
@@ -198,7 +198,7 @@ class _DevicePairingScreenState extends State<DevicePairingScreen> {
                         .map(
                           (device) => _buildDeviceTile(device, isPaired: true),
                         )
-                        .toList(),
+                        ,
                     const SizedBox(height: 16),
                   ],
 
@@ -229,7 +229,7 @@ class _DevicePairingScreenState extends State<DevicePairingScreen> {
                   else
                     ..._discoveryResults
                         .map((r) => _buildDeviceTile(r.device))
-                        .toList(),
+                        ,
                 ],
               ),
             ),
