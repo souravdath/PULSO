@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/ecg_data.dart';
 
@@ -210,6 +211,108 @@ class ECGStorageService {
     } catch (e) {
       print('Error getting session count: $e');
       return 0;
+    }
+  }
+
+  /// Upload ECG chart image to Supabase Storage
+  /// Returns the public URL of the uploaded image, or null if upload fails
+  Future<String?> uploadECGImage({
+    required File imageFile,
+    required String userId,
+    required int readingId,
+  }) async {
+    try {
+      // Create file path: user_id/reading_id.png
+      final String fileName = '$userId/$readingId.png';
+
+      // Upload to Supabase Storage bucket 'ecg-images'
+      await _supabase.storage
+          .from('ecg-images')
+          .upload(
+            fileName,
+            imageFile,
+            fileOptions: const FileOptions(
+              cacheControl: '3600',
+              upsert: true, // Replace if exists
+            ),
+          );
+
+      // Get public URL
+      final String imageUrl = _supabase.storage
+          .from('ecg-images')
+          .getPublicUrl(fileName);
+
+      print('ECG image uploaded successfully: $imageUrl');
+      return imageUrl;
+    } catch (e) {
+      print('Error uploading ECG image: $e');
+      return null;
+    }
+  }
+
+  /// Update the image URL for an existing ECG reading
+  Future<bool> updateImageUrl(int readingId, String imageUrl) async {
+    try {
+      await _supabase
+          .from('ecg_readings')
+          .update({'ecg_image_url': imageUrl})
+          .eq('reading_id', readingId);
+
+      print('Image URL updated for reading $readingId');
+      return true;
+    } catch (e) {
+      print('Error updating image URL: $e');
+      return false;
+    }
+  }
+
+  /// Delete ECG image from Supabase Storage
+  Future<bool> deleteECGImage(String userId, int readingId) async {
+    try {
+      final String fileName = '$userId/$readingId.png';
+      await _supabase.storage.from('ecg-images').remove([fileName]);
+
+      print('ECG image deleted: $fileName');
+      return true;
+    } catch (e) {
+      print('Error deleting ECG image: $e');
+      return false;
+    }
+  }
+
+  /// Save session with ECG image
+  /// This is a convenience method that combines session saving and image upload
+  Future<int?> saveSessionWithImage({
+    required ECGSession session,
+    required File imageFile,
+  }) async {
+    try {
+      // 1. Save session to get reading_id
+      final readingId = await saveSession(session);
+      if (readingId == null) {
+        print('Failed to save session');
+        return null;
+      }
+
+      // 2. Upload image
+      final imageUrl = await uploadECGImage(
+        imageFile: imageFile,
+        userId: session.userId,
+        readingId: readingId,
+      );
+
+      if (imageUrl == null) {
+        print('Failed to upload image, but session was saved');
+        return readingId;
+      }
+
+      // 3. Update session with image URL
+      await updateImageUrl(readingId, imageUrl);
+
+      return readingId;
+    } catch (e) {
+      print('Error saving session with image: $e');
+      return null;
     }
   }
 }

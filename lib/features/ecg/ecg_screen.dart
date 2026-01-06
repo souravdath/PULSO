@@ -7,8 +7,12 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:screenshot/screenshot.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme.dart';
 import '../../services/ecg_processor.dart';
+import '../../services/ecg_chart_capture_service.dart';
+import '../../services/ecg_storage_service.dart';
 import '../../models/ecg_data.dart';
 import '../../models/session_context.dart';
 import '../../services/session_context_service.dart';
@@ -46,6 +50,11 @@ class _ECGScreenState extends State<ECGScreen> {
   final List<int> _rPeakXPositions =
       []; // X-coordinates of R-peaks for visualization
 
+  // Screenshot & Storage
+  final ECGChartCaptureService _captureService = ECGChartCaptureService();
+  final ECGStorageService _storageService = ECGStorageService();
+  DateTime? _sessionStartTime;
+
   // Metrics
   double _currentHeartRate = 0;
   int _totalRPeaks = 0;
@@ -55,6 +64,7 @@ class _ECGScreenState extends State<ECGScreen> {
     super.initState();
     // Initialize ECG Processor with ESP32 sampling rate
     _ecgProcessor = ECGProcessor(samplingRate: 860);
+    _sessionStartTime = DateTime.now();
 
     // Initialize with some empty spots for smoother start
     for (int i = 0; i < _maxPoints; i++) {
@@ -101,14 +111,24 @@ class _ECGScreenState extends State<ECGScreen> {
     }
   }
 
-  void _disconnect() {
+  void _disconnect() async {
+    if (_isConnected && _totalRPeaks > 0) {
+      // Save session with image before disconnecting
+      await _saveSessionWithImage();
+    }
+
     _connection?.dispose();
     _connection = null;
     setState(() {
       _isConnected = false;
       _dataBuffer = "";
-      _sessionContext = null; // Clear session context on disconnect
+      _currentHeartRate = 0;
+      _totalRPeaks = 0;
     });
+    // Reset processor for next session
+    _ecgProcessor.reset();
+    _rPeakXPositions.clear();
+    _sessionStartTime = DateTime.now();
   }
 
   Future<void> _connectToDevice(BluetoothDevice device) async {
@@ -215,6 +235,75 @@ class _ECGScreenState extends State<ECGScreen> {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
+  /// Save ECG session with captured chart image
+  Future<void> _saveSessionWithImage() async {
+    try {
+      // Show loading indicator
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Saving session...'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+
+      // Get current user
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+      if (userId == null) {
+        print('User not logged in, cannot save session');
+        return;
+      }
+
+      // Capture chart image
+      final imageFile = await _captureService.captureChart(
+        userId: userId,
+        sessionId: DateTime.now().millisecondsSinceEpoch.toString(),
+      );
+
+      if (imageFile == null) {
+        print('Failed to capture chart image');
+        if (mounted) {
+          _showSnackBar('Failed to capture ECG image');
+        }
+        return;
+      }
+
+      // Create session object
+      final session = ECGSession(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        userId: userId,
+        startTime: _sessionStartTime ?? DateTime.now(),
+        endTime: DateTime.now(),
+        durationSeconds: DateTime.now()
+            .difference(_sessionStartTime ?? DateTime.now())
+            .inSeconds,
+        samples: [], // Not storing raw samples
+        rPeaks: _ecgProcessor.getDetectedRPeaks(),
+      );
+
+      // Save session with image
+      final readingId = await _storageService.saveSessionWithImage(
+        session: session,
+        imageFile: imageFile,
+      );
+
+      // Clean up temporary file
+      await _captureService.deleteTemporaryImage(imageFile);
+
+      if (readingId != null && mounted) {
+        _showSnackBar('Session saved successfully!');
+      } else if (mounted) {
+        _showSnackBar('Failed to save session');
+      }
+    } catch (e) {
+      print('Error saving session: $e');
+      if (mounted) {
+        _showSnackBar('Error saving session: $e');
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -286,74 +375,78 @@ class _ECGScreenState extends State<ECGScreen> {
                   children: [
                     // Grid Background
                     Positioned.fill(child: CustomPaint(painter: GridPainter())),
-                    // Main Chart
+                    // Main Chart wrapped with Screenshot
                     Padding(
                       padding: const EdgeInsets.all(24.0),
-                      child: LineChart(
-                        LineChartData(
-                          minY: _minY,
-                          maxY: _maxY,
-                          minX: _spots.isNotEmpty ? _spots.first.x : 0,
-                          maxX: _spots.isNotEmpty ? _spots.last.x : 0,
-                          gridData: FlGridData(
-                            show: false,
-                          ), // Using custom painter for cleaner look
-                          titlesData: FlTitlesData(show: false),
-                          borderData: FlBorderData(show: false),
-                          // R-peak vertical line markers
-                          extraLinesData: ExtraLinesData(
-                            verticalLines: _rPeakXPositions.map((xPos) {
-                              return VerticalLine(
-                                x: xPos.toDouble(),
-                                color: Colors.red.withOpacity(0.6),
-                                strokeWidth: 2,
-                                dashArray: [4, 4],
-                              );
-                            }).toList(),
-                          ),
-                          lineBarsData: [
-                            LineChartBarData(
-                              spots: _spots,
-                              isCurved: true,
-                              curveSmoothness: 0.2,
-                              color: AppColors.secondary,
-                              barWidth: 3,
-                              isStrokeCapRound: true,
-                              dotData: FlDotData(
-                                show: true,
-                                checkToShowDot: (spot, barData) {
-                                  // Show dots only at R-peaks
-                                  return _rPeakXPositions.contains(
-                                    spot.x.toInt(),
-                                  );
-                                },
-                                getDotPainter: (spot, percent, barData, index) {
-                                  return FlDotCirclePainter(
-                                    radius: 5,
-                                    color: Colors.red,
-                                    strokeWidth: 2,
-                                    strokeColor: Colors.white,
-                                  );
-                                },
-                              ),
-                              belowBarData: BarAreaData(
-                                show: true,
-                                gradient: LinearGradient(
-                                  colors: [
-                                    AppColors.secondary.withOpacity(0.2),
-                                    AppColors.secondary.withOpacity(0.0),
-                                  ],
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
+                      child: Screenshot(
+                        controller: _captureService.screenshotController,
+                        child: LineChart(
+                          LineChartData(
+                            minY: _minY,
+                            maxY: _maxY,
+                            minX: _spots.isNotEmpty ? _spots.first.x : 0,
+                            maxX: _spots.isNotEmpty ? _spots.last.x : 0,
+                            gridData: FlGridData(
+                              show: false,
+                            ), // Using custom painter for cleaner look
+                            titlesData: FlTitlesData(show: false),
+                            borderData: FlBorderData(show: false),
+                            // R-peak vertical line markers
+                            extraLinesData: ExtraLinesData(
+                              verticalLines: _rPeakXPositions.map((xPos) {
+                                return VerticalLine(
+                                  x: xPos.toDouble(),
+                                  color: Colors.red.withOpacity(0.6),
+                                  strokeWidth: 2,
+                                  dashArray: [4, 4],
+                                );
+                              }).toList(),
+                            ),
+                            lineBarsData: [
+                              LineChartBarData(
+                                spots: _spots,
+                                isCurved: true,
+                                curveSmoothness: 0.2,
+                                color: AppColors.secondary,
+                                barWidth: 3,
+                                isStrokeCapRound: true,
+                                dotData: FlDotData(
+                                  show: true,
+                                  checkToShowDot: (spot, barData) {
+                                    // Show dots only at R-peaks
+                                    return _rPeakXPositions.contains(
+                                      spot.x.toInt(),
+                                    );
+                                  },
+                                  getDotPainter:
+                                      (spot, percent, barData, index) {
+                                        return FlDotCirclePainter(
+                                          radius: 5,
+                                          color: Colors.red,
+                                          strokeWidth: 2,
+                                          strokeColor: Colors.white,
+                                        );
+                                      },
+                                ),
+                                belowBarData: BarAreaData(
+                                  show: true,
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      AppColors.secondary.withOpacity(0.2),
+                                      AppColors.secondary.withOpacity(0.0),
+                                    ],
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
-                          lineTouchData: LineTouchData(
-                            enabled: false,
-                          ), // Disable touch for performance
+                            ],
+                            lineTouchData: LineTouchData(
+                              enabled: false,
+                            ), // Disable touch for performance
+                          ),
                         ),
-                      ),
+                      ), // Close Screenshot widget
                     ),
                   ],
                 ),
