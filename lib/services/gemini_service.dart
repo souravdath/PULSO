@@ -3,6 +3,8 @@ import 'package:google_generative_ai/google_generative_ai.dart';
 import '../models/session_context.dart';
 import '../models/ecg_summary.dart';
 
+import 'dart:io';
+
 class GeminiService {
   // TODO: Replace with your actual key or use --dart-define=GEMINI_API_KEY=...
   static const String _apiKey = String.fromEnvironment('GEMINI_API_KEY', defaultValue: ''); 
@@ -11,24 +13,40 @@ class GeminiService {
 
   GeminiService() {
     _model = GenerativeModel(
-      model: 'gemini-pro',
+      model: 'gemini-1.5-flash',
       apiKey: _apiKey,
     );
   }
 
   Future<String> generateConsultation(
     SessionContext context,
-    EcgSummary summary,
-  ) async {
+    EcgSummary summary, {
+    File? chartImage,
+  }) async {
     if (_apiKey.isEmpty) {
       return "Error: Gemini API Key is missing. Please provide it via --dart-define=GEMINI_API_KEY=YOUR_KEY or hardcode it in gemini_service.dart.";
     }
 
-    final prompt = _buildPrompt(context, summary);
+    final promptText = _buildPrompt(context, summary);
+    final contentParts = [Content.text(promptText)];
+
+    if (chartImage != null) {
+      try {
+        final imageBytes = await chartImage.readAsBytes();
+        contentParts.add(Content.data('image/png', imageBytes));
+      } catch (e) {
+        print("Error reading chart image: $e");
+      }
+    }
     
     try {
-      final content = [Content.text(prompt)];
-      final response = await _model.generateContent(content);
+      final response = await _model.generateContent([
+        Content.multi(contentParts.map((e) {
+          if (e.parts.first is TextPart) return TextPart((e.parts.first as TextPart).text);
+          if (e.parts.first is DataPart) return DataPart((e.parts.first as DataPart).mimeType, (e.parts.first as DataPart).bytes);
+          return TextPart(''); // Fallback
+        }).toList())
+      ]);
       return response.text ?? "Unable to generate insights at this time.";
     } catch (e) {
       return "Error generating insights: $e";
@@ -38,7 +56,7 @@ class GeminiService {
   String _buildPrompt(SessionContext context, EcgSummary summary) {
     return '''
 You are an expert cardiologist AI assistant named "Pulso AI".
-Analyze the following ECG session data and user context to provide a brief, professional, and empathetic consultation report.
+Analyze the following ECG session data, user context, and the attached ECG chart image (if available) to provide a brief, professional, and empathetic consultation report.
 
 USER CONTEXT:
 - Time of Day: ${context.timeOfDay}
@@ -53,12 +71,12 @@ ECG SESSION METRICS:
 - Duration: ${summary.durationSeconds} seconds
 
 INSTRUCTIONS:
-1. Provide a "Heart Rate Analysis": Is the HR normal for the given activity/stress/stimulants?
-2. Provide a "stress & Lifestyle Impact" section: How might the reported stress/stimulants be affecting the heart rate?
-3. Provide "Recommendations": 1-2 actionable tips based on the data.
-4. If the HR is abnormally high (>100 resting) or low (<60 active), kindly suggest consulting a doctor, but disclaim you are an AI.
-5. Keep the tone supportive and professional.
-6. Return the response in Markdown format.
+1. Provide a "Heart Rate Analysis": Is the HR normal for the given context?
+2. If the ECG chart image is provided, analyze the waveform for visible regularity or irregularity (rhythm analysis). Mention if you see clear R-peaks.
+3. Provide a "Stress & Lifestyle Impact" section.
+4. Provide "Recommendations": 1-2 actionable tips.
+5. Disclaimer: You are an AI, not a doctor. Suggest professional help for abnormalities.
+6. Return response in Markdown.
 ''';
   }
 }

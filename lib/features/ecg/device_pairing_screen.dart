@@ -27,7 +27,8 @@ class _DevicePairingScreenState extends State<DevicePairingScreen> {
 
   @override
   void dispose() {
-    _cancelDiscovery();
+    _discoveryStreamSubscription?.cancel();
+    _discoveryStreamSubscription = null;
     super.dispose();
   }
 
