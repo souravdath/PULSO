@@ -8,6 +8,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../core/theme.dart';
+import '../../services/ecg_processor.dart';
+import '../../models/ecg_data.dart';
 import '../../models/session_context.dart';
 import '../../services/session_context_service.dart';
 
@@ -37,12 +39,21 @@ class _ECGScreenState extends State<ECGScreen> {
   final double _maxY = 26000;
   final int _maxPoints = 300;
 
-  // Metrics (Simple calculation placeholders)
-  int _currentHeartRate = 0;
+  // Pan-Tompkins Processor
+  late ECGProcessor _ecgProcessor;
+  final List<int> _rPeakXPositions =
+      []; // X-coordinates of R-peaks for visualization
+
+  // Metrics
+  double _currentHeartRate = 0;
+  int _totalRPeaks = 0;
 
   @override
   void initState() {
     super.initState();
+    // Initialize ECG Processor with ESP32 sampling rate
+    _ecgProcessor = ECGProcessor(samplingRate: 860);
+
     // Initialize with some empty spots for smoother start
     for (int i = 0; i < _maxPoints; i++) {
       _spots.add(FlSpot(i.toDouble(), 0));
@@ -61,8 +72,10 @@ class _ECGScreenState extends State<ECGScreen> {
       _disconnect();
     } else {
       // Step 1: Get pre-monitoring context first
-      final SessionContext? sessionContext = await context.push('/ecg/premonitoring');
-      
+      final SessionContext? sessionContext = await context.push(
+        '/ecg/premonitoring',
+      );
+
       if (sessionContext == null) {
         // User cancelled the questionnaire
         return;
@@ -158,21 +171,34 @@ class _ECGScreenState extends State<ECGScreen> {
 
   void _processPacket(String packet) {
     try {
-      double voltage = double.parse(packet);
+      double rawValue = double.parse(packet);
+
+      // Process through Pan-Tompkins algorithm
+      final (filteredValue, isRPeak) = _ecgProcessor.processSample(rawValue);
 
       if (mounted) {
         setState(() {
-          _spots.add(FlSpot(_xValue, voltage));
-          _xValue++;
-          if (_spots.length > _maxPoints) {
-            _spots.removeAt(0);
+          // Add raw ECG value to chart
+          _spots.add(FlSpot(_xValue, rawValue));
+
+          // If R-peak detected, store its position for visualization
+          if (isRPeak) {
+            _rPeakXPositions.add(_xValue.toInt());
+            _totalRPeaks++;
+
+            // Calculate real-time BPM from processor
+            _currentHeartRate = _ecgProcessor.calculateBPM();
           }
 
-          // Simple visualization of 'activity' for heart rate (mock logic for UI)
-          // In real app, implement QRS detection here
-          if (voltage > 12000) {
-            _currentHeartRate =
-                72 + (_xValue % 5).toInt(); // Just to show life in UI
+          _xValue++;
+
+          // Maintain sliding window
+          if (_spots.length > _maxPoints) {
+            _spots.removeAt(0);
+
+            // Remove R-peak markers that are no longer visible
+            final minVisibleX = _xValue - _maxPoints;
+            _rPeakXPositions.removeWhere((x) => x < minVisibleX);
           }
         });
       }
@@ -272,6 +298,17 @@ class _ECGScreenState extends State<ECGScreen> {
                           ), // Using custom painter for cleaner look
                           titlesData: FlTitlesData(show: false),
                           borderData: FlBorderData(show: false),
+                          // R-peak vertical line markers
+                          extraLinesData: ExtraLinesData(
+                            verticalLines: _rPeakXPositions.map((xPos) {
+                              return VerticalLine(
+                                x: xPos.toDouble(),
+                                color: Colors.red.withOpacity(0.6),
+                                strokeWidth: 2,
+                                dashArray: [4, 4],
+                              );
+                            }).toList(),
+                          ),
                           lineBarsData: [
                             LineChartBarData(
                               spots: _spots,
@@ -280,7 +317,23 @@ class _ECGScreenState extends State<ECGScreen> {
                               color: AppColors.secondary,
                               barWidth: 3,
                               isStrokeCapRound: true,
-                              dotData: FlDotData(show: false),
+                              dotData: FlDotData(
+                                show: true,
+                                checkToShowDot: (spot, barData) {
+                                  // Show dots only at R-peaks
+                                  return _rPeakXPositions.contains(
+                                    spot.x.toInt(),
+                                  );
+                                },
+                                getDotPainter: (spot, percent, barData, index) {
+                                  return FlDotCirclePainter(
+                                    radius: 5,
+                                    color: Colors.red,
+                                    strokeWidth: 2,
+                                    strokeColor: Colors.white,
+                                  );
+                                },
+                              ),
                               belowBarData: BarAreaData(
                                 show: true,
                                 gradient: LinearGradient(
@@ -332,8 +385,17 @@ class _ECGScreenState extends State<ECGScreen> {
                     children: [
                       _buildMetric(
                         "Heart Rate",
-                        _currentHeartRate > 0 ? "$_currentHeartRate" : "--",
+                        _currentHeartRate > 0
+                            ? "${_currentHeartRate.toInt()}"
+                            : "--",
                         Icons.monitor_heart,
+                        Colors.red,
+                      ),
+                      Container(width: 1, height: 40, color: Colors.grey[200]),
+                      _buildMetric(
+                        "R-Peaks",
+                        _totalRPeaks.toString(),
+                        Icons.favorite,
                         Colors.red,
                       ),
                       Container(width: 1, height: 40, color: Colors.grey[200]),
@@ -342,13 +404,6 @@ class _ECGScreenState extends State<ECGScreen> {
                         _spots.isNotEmpty ? "${_spots.last.y.toInt()}" : "--",
                         Icons.electric_bolt,
                         AppColors.primary,
-                      ),
-                      Container(width: 1, height: 40, color: Colors.grey[200]),
-                      _buildMetric(
-                        "Queue Size",
-                        _spots.length.toString(),
-                        Icons.storage,
-                        Colors.orange,
                       ),
                     ],
                   ),

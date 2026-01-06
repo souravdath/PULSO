@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
+import 'package:permission_handler/permission_handler.dart'; // Add this import
 import '../../core/theme.dart';
 
 class DevicePairingScreen extends StatefulWidget {
@@ -21,9 +22,7 @@ class _DevicePairingScreenState extends State<DevicePairingScreen> {
   @override
   void initState() {
     super.initState();
-    _checkPermissions();
-    _getBondedDevices();
-    _startDiscovery();
+    _initializeBluetooth();
   }
 
   @override
@@ -32,12 +31,51 @@ class _DevicePairingScreenState extends State<DevicePairingScreen> {
     super.dispose();
   }
 
-  void _checkPermissions() async {
-    // Bluetooth permissions are handled by Android Manifest,
-    // but we can check if bluetooth is enabled.
-    bool? isEnabled = await FlutterBluetoothSerial.instance.isEnabled;
-    if (isEnabled == false) {
-      await FlutterBluetoothSerial.instance.requestEnable();
+  Future<void> _initializeBluetooth() async {
+    await _checkPermissions();
+    await _getBondedDevices();
+    _startDiscovery();
+  }
+
+  Future<void> _checkPermissions() async {
+    try {
+      // Request location permission (required for Bluetooth scanning on Android)
+      Map<Permission, PermissionStatus> statuses = await [
+        Permission.bluetoothScan,
+        Permission.bluetoothConnect,
+        Permission.location,
+      ].request();
+
+      // Check if all permissions are granted
+      bool allGranted = statuses.values.every((status) => status.isGranted);
+      
+      if (!allGranted && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Location permission is required to scan for Bluetooth devices'),
+            duration: Duration(seconds: 4),
+          ),
+        );
+        return;
+      }
+
+      // Check if Bluetooth is enabled
+      bool? isEnabled = await FlutterBluetoothSerial.instance.isEnabled;
+      if (isEnabled == false) {
+        bool? enableResult = await FlutterBluetoothSerial.instance.requestEnable();
+        if (enableResult != true && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Bluetooth must be enabled to scan for devices')),
+          );
+        }
+      }
+    } catch (error) {
+      print("Error checking permissions: $error");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Permission error: $error')),
+        );
+      }
     }
   }
 
@@ -64,31 +102,48 @@ class _DevicePairingScreenState extends State<DevicePairingScreen> {
   }
 
   void _startDiscovery() {
+    setState(() {
+      _isScanning = true;
+    });
+    
     _discoveryStreamSubscription = FlutterBluetoothSerial.instance
         .startDiscovery()
-        .listen((r) {
-          if (mounted) {
-            setState(() {
-              // Avoid duplicates
-              final existingIndex = _discoveryResults.indexWhere(
-                (element) => element.device.address == r.device.address,
+        .listen(
+          (r) {
+            if (mounted) {
+              setState(() {
+                // Avoid duplicates
+                final existingIndex = _discoveryResults.indexWhere(
+                  (element) => element.device.address == r.device.address,
+                );
+                if (existingIndex >= 0) {
+                  _discoveryResults[existingIndex] = r;
+                } else {
+                  _discoveryResults.add(r);
+                }
+              });
+            }
+          },
+          onError: (error) {
+            print("Discovery error: $error");
+            if (mounted) {
+              setState(() {
+                _isScanning = false;
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Scan error: $error')),
               );
-              if (existingIndex >= 0) {
-                _discoveryResults[existingIndex] = r;
-              } else {
-                _discoveryResults.add(r);
-              }
-            });
-          }
-        });
-
-    _discoveryStreamSubscription!.onDone(() {
-      if (mounted) {
-        setState(() {
-          _isScanning = false;
-        });
-      }
-    });
+            }
+          },
+          onDone: () {
+            if (mounted) {
+              setState(() {
+                _isScanning = false;
+              });
+            }
+          },
+          cancelOnError: false,
+        );
   }
 
   void _cancelDiscovery() {
@@ -234,14 +289,12 @@ class _DevicePairingScreenState extends State<DevicePairingScreen> {
 
   Widget _buildDeviceTile(BluetoothDevice device, {bool isPaired = false}) {
     final deviceName = device.name ?? "Unknown Device";
-    final isConnected = device
-        .isConnected; // Note: isConnected might not be reliable without active check
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
         leading: Icon(
-          Icons.watch, // Or Icons.bluetooth
+          Icons.watch,
           color: isPaired ? AppColors.primary : AppColors.textLight,
         ),
         title: Text(
