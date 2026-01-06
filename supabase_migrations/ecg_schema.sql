@@ -15,7 +15,8 @@ ALTER TABLE public.ecg_readings
   ADD COLUMN IF NOT EXISTS max_heart_rate REAL,
   ADD COLUMN IF NOT EXISTS min_heart_rate REAL,
   ADD COLUMN IF NOT EXISTS r_peak_count INTEGER,
-  ADD COLUMN IF NOT EXISTS session_end_time TIMESTAMP WITH TIME ZONE;
+  ADD COLUMN IF NOT EXISTS session_end_time TIMESTAMP WITH TIME ZONE,
+  ADD COLUMN IF NOT EXISTS ecg_image_url TEXT;
 
 -- Table: ecg_r_peaks
 -- Stores detected R-peaks for each ECG reading/session
