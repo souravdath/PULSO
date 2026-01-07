@@ -160,7 +160,7 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         title: Text(
           'Log In',
-          style: GoogleFonts.inter(color: AppColors.textLight),
+          style: GoogleFonts.inter(color: Theme.of(context).textTheme.titleLarge?.color),
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -230,7 +230,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: Text(
                       'OR',
                       style: GoogleFonts.outfit(
-                        color: AppColors.textLight.withOpacity(0.6),
+                        color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.6),
                         fontWeight: FontWeight.w500,
                       ),
                     ),

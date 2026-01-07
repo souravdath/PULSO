@@ -9,7 +9,7 @@ class WelcomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundLight,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24.0),
@@ -26,7 +26,7 @@ class WelcomeScreen extends StatelessWidget {
                 style: GoogleFonts.outfit(
                   fontSize: 32,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.textLight,
+                  color: Theme.of(context).textTheme.headlineMedium?.color,
                 ),
               ),
               const SizedBox(height: 10),
@@ -35,7 +35,7 @@ class WelcomeScreen extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: GoogleFonts.outfit(
                   fontSize: 16,
-                  color: AppColors.textLight.withOpacity(0.6),
+                  color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6),
                 ),
               ),
               const Spacer(),
@@ -72,7 +72,7 @@ class WelcomeScreen extends StatelessWidget {
                 child: Text(
                   'Continue as Guest',
                   style: GoogleFonts.outfit(
-                    color: AppColors.textLight.withOpacity(0.6),
+                    color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.6),
                     decoration: TextDecoration.underline,
                   ),
                 ),

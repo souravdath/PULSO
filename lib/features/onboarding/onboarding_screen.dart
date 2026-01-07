@@ -50,7 +50,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundDark, // Dark theme for onboarding
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [
@@ -61,7 +61,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 onPressed: _onSkip,
                 child: Text(
                   'Skip',
-                  style: TextStyle(color: AppColors.textDark.withOpacity(0.6)),
+                  style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6)),
                 ),
               ),
             ),
@@ -100,7 +100,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         decoration: BoxDecoration(
                           color: _currentPage == index
                               ? AppColors.primary
-                              : AppColors.surfaceLight.withOpacity(0.2),
+                              : Theme.of(context).colorScheme.onSurface.withOpacity(0.2),
                           borderRadius: BorderRadius.circular(4),
                         ),
                       ),
@@ -141,7 +141,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           Container(
             padding: const EdgeInsets.all(40),
             decoration: BoxDecoration(
-              color: AppColors.surfaceDark,
+              color: Theme.of(context).colorScheme.surface,
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
@@ -164,7 +164,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             style: GoogleFonts.outfit(
               fontSize: 28,
               fontWeight: FontWeight.bold,
-              color: AppColors.textDark,
+              color: Theme.of(context).textTheme.displayLarge?.color,
             ),
           ),
           const SizedBox(height: 16),
@@ -173,7 +173,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             textAlign: TextAlign.center,
             style: GoogleFonts.outfit(
               fontSize: 16,
-              color: AppColors.textDark.withOpacity(0.7),
+              color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7),
               height: 1.5,
             ),
           ),

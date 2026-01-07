@@ -18,7 +18,15 @@ Future<void> main() async {
     anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNjaWp6cGR0a3V4cG53a2Zyb2d6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxNDYyOTEsImV4cCI6MjA4MjcyMjI5MX0.0NWEp951xowuoCX9nNMaCckp_XtPhVXHeQsGuTsYBPM',
   );
 
-  runApp(const PulsoApp());
+  final themeProvider = ThemeProvider();
+  await themeProvider.init();
+
+  runApp(
+    ChangeNotifierProvider.value(
+      value: themeProvider,
+      child: const PulsoApp(),
+    ),
+  );
 }
 
 class PulsoApp extends StatelessWidget {
@@ -28,8 +36,7 @@ class PulsoApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => ThemeProvider()),
-        // This is where you will later add your AuthProvider
+        // ThemeProvider is already provided at the root in main()
         Provider(create: (_) => Object()), 
       ],
       child: Consumer<ThemeProvider>(

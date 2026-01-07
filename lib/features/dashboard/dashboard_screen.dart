@@ -166,7 +166,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Text(
                 "Start your first ECG recording to see your heart health status.",
                 style: GoogleFonts.inter(
-                  color: AppColors.textLight.withOpacity(0.8),
+                  color: Theme.of(context).colorScheme.primary.withOpacity(0.8),
                   fontSize: 14,
                 ),
               ),
@@ -251,12 +251,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: AppColors.backgroundLight,
+                color: Theme.of(context).colorScheme.surface,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.bluetooth_searching,
-                color: AppColors.textLight,
+                color: Theme.of(context).iconTheme.color,
               ),
             ),
             const SizedBox(width: 16),
@@ -267,14 +267,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   "Device Pairing",
                   style: GoogleFonts.inter(
                     fontWeight: FontWeight.bold,
-                    color: AppColors.textLight,
+                    color: Theme.of(context).textTheme.bodyLarge?.color,
                   ),
                 ),
                 Text(
                   "Connect to capture new data",
                   style: GoogleFonts.inter(
                     fontSize: 12,
-                    color: AppColors.textLight.withOpacity(0.6),
+                    color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.6),
                   ),
                 ),
               ],
@@ -334,9 +334,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surfaceLight,
+        color: Theme.of(context).cardTheme.color,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.withOpacity(0.1)),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Column(
         children: [
@@ -347,14 +347,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
             style: GoogleFonts.inter(
               fontWeight: FontWeight.bold,
               fontSize: 16,
-              color: AppColors.textLight,
+              color: Theme.of(context).textTheme.bodyLarge?.color,
             ),
           ),
           Text(
             label,
             style: GoogleFonts.inter(
               fontSize: 12,
-              color: AppColors.textLight.withOpacity(0.6),
+              color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.6),
             ),
           ),
         ],
