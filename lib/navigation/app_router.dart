@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../models/ecg_data.dart';
 import '../features/onboarding/splash_screen.dart';
 import '../features/onboarding/onboarding_screen.dart';
 import '../features/auth/welcome_screen.dart';
@@ -84,7 +85,10 @@ class AppRouter {
                   GoRoute(
                     path: 'summary',
                     parentNavigatorKey: _rootNavigatorKey, // Full screen
-                    builder: (context, state) => const SessionSummaryScreen(),
+                    builder: (context, state) {
+                      final data = state.extra as Map<String, dynamic>? ?? {};
+                      return SessionSummaryScreen(resultData: data);
+                    },
                   ),
                 ],
               ),
@@ -104,7 +108,10 @@ class AppRouter {
                   GoRoute(
                     path: 'report',
                     parentNavigatorKey: _rootNavigatorKey,
-                    builder: (context, state) => const DetailedReportScreen(),
+                    builder: (context, state) {
+                      final session = state.extra as ECGSession;
+                      return DetailedReportScreen(session: session);
+                    },
                   ),
                 ],
               ),

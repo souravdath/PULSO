@@ -4,10 +4,21 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../core/theme.dart';
 
 class SessionSummaryScreen extends StatelessWidget {
-  const SessionSummaryScreen({super.key});
+  /// Expects a Map<String, dynamic> with keys: 
+  /// 'avgHr', 'maxHr', 'minHr', 'duration', 'report'
+  final Map<String, dynamic> resultData;
+
+  const SessionSummaryScreen({super.key, required this.resultData});
 
   @override
   Widget build(BuildContext context) {
+    // Extract data with safe fallbacks
+    final int duration = resultData['duration'] is int ? resultData['duration'] : 0;
+    final double avgHr = resultData['avgHr'] is num ? (resultData['avgHr'] as num).toDouble() : 0.0;
+    final double maxHr = resultData['maxHr'] is num ? (resultData['maxHr'] as num).toDouble() : 0.0;
+    final double minHr = resultData['minHr'] is num ? (resultData['minHr'] as num).toDouble() : 0.0;
+    final String? aiReport = resultData['report'] as String?;
+
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(
@@ -37,73 +48,75 @@ class SessionSummaryScreen extends StatelessWidget {
             // Metrics Grid
             Row(
               children: [
-                _buildMetricTile("Duration", "30s"),
+                _buildMetricTile("Duration", "${duration}s"),
                 const SizedBox(width: 16),
-                _buildMetricTile("Avg HR", "75 bpm"),
+                _buildMetricTile("Avg HR", "${avgHr.round()} bpm"),
               ],
             ),
             const SizedBox(height: 16),
             Row(
               children: [
-                _buildMetricTile("Max HR", "82 bpm"),
+                _buildMetricTile("Max HR", "${maxHr.round()} bpm"),
                 const SizedBox(width: 16),
-                _buildMetricTile("Min HR", "68 bpm"),
+                _buildMetricTile("Min HR", "${minHr.round()} bpm"),
               ],
             ),
              const SizedBox(height: 40),
 
             // AI Analysis Teaser
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.primary.withOpacity(0.2)),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.auto_awesome, color: AppColors.primary),
-                      const SizedBox(width: 8),
-                      Text(
-                        "AI Analysis Ready",
-                        style: GoogleFonts.outfit(
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.primary,
-                          fontSize: 16,
+            if (aiReport != null)
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.auto_awesome, color: AppColors.primary),
+                        const SizedBox(width: 8),
+                        Text(
+                          "AI Analysis Ready",
+                          style: GoogleFonts.outfit(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primary,
+                            fontSize: 16,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    "Our algorithms have analyzed your rhythm. Tap below to see the full report.",
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.outfit(color: AppColors.textLight),
-                  ),
-                ],
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      "Our algorithms have analyzed your rhythm. Tap below to see the full report.",
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.outfit(color: AppColors.textLight),
+                    ),
+                  ],
+                ),
               ),
-            ),
             const Spacer(),
 
             // Buttons
-            ElevatedButton(
-              onPressed: () {
-                 // TODO: Go to Detailed Report (Insights)
-                 // For now, go to insights tab
-                 context.go('/insights');
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+            if (aiReport != null) ...[
+              ElevatedButton(
+                onPressed: () {
+                   // Pass the report to the Insights screen
+                   context.go('/insights', extra: aiReport);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                ),
+                child: const Text("View AI Report"),
               ),
-              child: const Text("View AI Report"),
-            ),
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
+            ],
             TextButton(
               onPressed: () => context.go('/dashboard'),
               child: const Text("Return to Dashboard"),

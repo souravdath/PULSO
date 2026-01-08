@@ -29,7 +29,7 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundDark,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -47,7 +47,7 @@ class _SplashScreenState extends State<SplashScreen> {
               style: GoogleFonts.outfit(
                 fontSize: 48,
                 fontWeight: FontWeight.bold,
-                color: AppColors.surfaceLight,
+                color: Theme.of(context).colorScheme.primary,
                 letterSpacing: 4,
               ),
             ),
@@ -56,7 +56,7 @@ class _SplashScreenState extends State<SplashScreen> {
               'ECG - Insights - Alerts',
               style: GoogleFonts.outfit(
                 fontSize: 16,
-                color: AppColors.textDark.withOpacity(0.7),
+                color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7),
                 letterSpacing: 1.2,
               ),
             ),
@@ -75,7 +75,7 @@ class _SplashScreenState extends State<SplashScreen> {
               'Powered by AI',
               style: GoogleFonts.outfit(
                 fontSize: 12,
-                color: AppColors.textDark.withOpacity(0.4),
+                color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.4),
               ),
             ),
           ],

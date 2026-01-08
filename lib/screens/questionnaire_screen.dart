@@ -12,25 +12,33 @@ class QuestionnaireScreen extends StatefulWidget {
 }
 
 class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
-  final _ageController = TextEditingController();
   final _conditionsController = TextEditingController();
+  DateTime? _selectedDOB;
   String _selectedGender = 'Male';
   bool _isLoading = false;
 
   Future<void> _submitData() async {
-    if (_ageController.text.isEmpty) {
+    if (_selectedDOB == null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Please enter your age')));
+      ).showSnackBar(const SnackBar(content: Text('Please select your Date of Birth')));
       return;
     }
 
     setState(() => _isLoading = true);
 
     try {
+      // Calculate age
+      final now = DateTime.now();
+      int age = now.year - _selectedDOB!.year;
+      if (now.month < _selectedDOB!.month || 
+          (now.month == _selectedDOB!.month && now.day < _selectedDOB!.day)) {
+        age--;
+      }
+
       // Using the function we wrote earlier in auth_service.dart
       await saveMedicalHistory(
-        age: int.parse(_ageController.text),
+        age: age,
         gender: _selectedGender,
         conditions: _conditionsController.text,
       );
@@ -56,13 +64,43 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
         padding: const EdgeInsets.all(24.0),
         child: Column(
           children: [
-            TextField(
-              controller: _ageController,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                labelText: 'Age',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+            InkWell(
+              onTap: () async {
+                final DateTime? picked = await showDatePicker(
+                  context: context,
+                  initialDate: DateTime.now().subtract(const Duration(days: 365 * 18)),
+                  firstDate: DateTime(1900),
+                  lastDate: DateTime.now(),
+                  builder: (context, child) {
+                    return Theme(
+                      data: Theme.of(context).copyWith(
+                        colorScheme: ColorScheme.light(
+                          primary: AppColors.primary,
+                        ),
+                      ),
+                      child: child!,
+                    );
+                  },
+                );
+                if (picked != null) {
+                  setState(() => _selectedDOB = picked);
+                }
+              },
+              child: InputDecorator(
+                decoration: InputDecoration(
+                  labelText: 'Date of Birth',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  suffixIcon: const Icon(Icons.calendar_today),
+                ),
+                child: Text(
+                  _selectedDOB == null
+                      ? 'Select Date of Birth'
+                      : '${_selectedDOB!.day}/${_selectedDOB!.month}/${_selectedDOB!.year}',
+                  style: GoogleFonts.outfit(
+                    color: _selectedDOB == null ? Colors.grey : Colors.black,
+                  ),
                 ),
               ),
             ),

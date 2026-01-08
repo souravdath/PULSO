@@ -75,7 +75,18 @@ class _SignupScreenState extends State<SignupScreen> {
 
       if (mounted) {
         if (response.user != null) {
-          context.go('/questionnaire');
+          // Sign out immediately so user has to log in manually
+          await AuthService().signOut();
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Account created successfully! Please log in.'),
+                backgroundColor: Colors.green,
+              ),
+            );
+            context.go('/login');
+          }
         }
       }
     } on AuthException catch (e) {
